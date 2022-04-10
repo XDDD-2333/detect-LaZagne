@@ -1,0 +1,59 @@
+#!/usr/bin/env bpftrace
+/*
+tracepoint:syscalls:sys_enter_ptrace
+    int __syscall_nr;
+    long request;
+    long pid;
+    unsigned long addr;
+    unsigned long data;
+tracepoint:syscalls:sys_exit_ptrace
+    int __syscall_nr;
+    long ret;
+
+tracepoint:syscalls:sys_enter_mprotect
+    int __syscall_nr;
+    unsigned long start;
+    size_t len;
+    unsigned long prot;
+tracepoint:syscalls:sys_exit_mprotect
+    int __syscall_nr;
+    long ret;
+*/
+
+
+BEGIN
+{
+	printf("Tracing ptrace mprotect ... Hit Ctrl-C to end.\n");
+	printf("%-6s %-16s %-8s \n", "PID", "COMM" , "SYSCALL_nr");
+
+}
+
+/*
+tracepoint:syscalls:sys_enter_ptrace
+{
+    printf("%-10s : %-6d %-16s %8d\n", probe, pid, comm, args->__syscall_nr);
+
+}
+*/
+
+tracepoint:syscalls:sys_enter*
+{
+ //   printf("%-10s : %-6d %-16s \n", probe, pid, comm);
+    printf("%-10s : %-6d \n", probe, pid);
+
+}
+
+/*
+tracepoint:syscalls:sys_enter_mprotect
+{
+    printf("sys_enter_mprotect : %-6d %-16s %8d\n", pid, comm, args->__syscall_nr);
+}
+
+*/
+
+
+END
+{
+  //  printf("%-6d %-16s %8d\n", pid, comm, args->__syscall_nr);
+    printf(" finish \n");
+}
