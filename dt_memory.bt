@@ -28,6 +28,16 @@ BEGIN
 
 }
 
+
+
+tracepoint:syscalls:sys_enter*
+{
+    printf("%-10s : %-6d %-16s \n", probe, pid, comm);
+    // printf("%-10s : %-6d \n", probe, pid);
+
+}
+
+
 /*
 tracepoint:syscalls:sys_enter_ptrace
 {
@@ -35,14 +45,6 @@ tracepoint:syscalls:sys_enter_ptrace
 
 }
 */
-
-tracepoint:syscalls:sys_enter*
-{
- //   printf("%-10s : %-6d %-16s \n", probe, pid, comm);
-    printf("%-10s : %-6d \n", probe, pid);
-
-}
-
 /*
 tracepoint:syscalls:sys_enter_mprotect
 {
@@ -50,7 +52,6 @@ tracepoint:syscalls:sys_enter_mprotect
 }
 
 */
-
 
 END
 {

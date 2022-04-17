@@ -11,6 +11,44 @@ import psutil
 
 # "PID", "COMM", "FD", "ERR", "PATH"
 
+rules = [
+    {
+        "desc": "[SYSTEM - GNOME]",
+        "process": r"gnome-keyring-daemon|gdm-password|gdm-session-worker",
+        "near": r"libgcrypt\.so\..+|libgck\-1\.so\.0|_pammodutil_getpwnam_|gkr_system_authtok",
+    },
+    {
+        "desc": "[SYSTEM - LightDM]",  # Ubuntu/xubuntu login screen :) https://doc.ubuntu-fr.org/lightdm
+        "process": r"lightdm",
+        "near": r"_pammodutil_getpwnam_|gkr_system_authtok",
+    },
+    {
+        "desc": "[SYSTEM - SSH Server]",
+        "process": r"/sshd$",
+        "near": r"sudo.+|_pammodutil_getpwnam_",
+    },
+    {
+        "desc": "[SSH Client]",
+        "process": r"/ssh$",
+        "near": r"sudo.+|/tmp/ICE-unix/[0-9]+",
+    },
+    {
+        "desc": "[SYSTEM - VSFTPD]",
+        "process": r"vsftpd",
+        "near": r"^::.+\:[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$",
+    },
+]  
+regex_type = type(re.compile("^plop$"))
+# precompile regexes to optimize speed
+for x in rules:
+    if "near" in x:
+        if type(x["near"]) != regex_type:
+            x["near"] = re.compile(x["near"])
+    if "process" in x:
+        if type(x["process"]) != regex_type:
+            x["process"] = re.compile(x["process"])  
+
+
 # chats模块
 prefix =    [".config/psi/profiles",".local/psi+/profiles",                         #chats
                 "sitemanager.xml", "recentservers.xml", "filezilla.xml",            #  |    #filezilla                                                          
@@ -33,15 +71,15 @@ monitorfiles = [
                 # "/.claws-mail/accountrc","/.claws-mail/accountrc/passwordstorerc",  #mails 
                 "/.claws-mail",  #"/.thunderbird",    #mails   -test_ok     由于未发现指定文件夹所以不再往下搜索                 
                 "/etc/NetworkManager/system-connections/","/etc/wpa_supplicant/wpa_supplicant.conf",  #wifi
-                "/etc/shadow",                                          #!!!但是易误检!!! sysadmin-shadow   
+                # "/etc/shadow",                                          #!!!但是易误检!!! sysadmin-shadow    TODO
                 
                 # ".config/keepassx/config.ini",".config/KeePass/KeePass.config.xml",    #sysadmin-keepassconfig
                 ".config/keepassx",".config/KeePass",               #sysadmin-keepassconfig    -test_ok  由于未发现指定文件夹所以不再往下搜索
                 "/boot/grub/menu.lst","/boot/grub/grub.conf","/boot/grub/grub.cfg" ,     #sysadmin-grup
                 
                 # ".gftp/bookmarks",".gftp/bookmarks/gftprc",                            #sysadmin-gftp 
-                ".gftp",                        #!!!但是易误检!!!  sysadmin-gftp  -test_ok   由于未发现指定文件夹所以不再往下搜索
-                "/etc/fstab",                   #!!!但是易误检!!!  sysadmin-fstab    
+                ".gftp",                        #!!!但是易误检!!!  sysadmin-gftp  -test_ok   由于未发现指定文件夹所以不再往下搜索   TODO
+                # "/etc/fstab",                   #!!!但是易误检!!!  sysadmin-fstab    TODO
                 ".docker/config.json",          #sysadmin-docker
                 
                 # ".history",".sh_history",".bash_history",".zhistory",   #sysadmin-cli  -cli 无法运行单个参数 dhz todo: all need?
@@ -51,6 +89,8 @@ monitorfiles = [
                 # ".ApacheDirectoryStudio/.metadata/.plugins/org.apache.directory.studio.connection.core/connections.xml"         #sysadmin-apachedirectorystudio 
                 ".ApacheDirectoryStudio",              #sysadmin-apachedirectorystudio   -test_ok 由于未发现指定文件夹所以不再往下搜索
                 ]
+
+memory_cnt = 3
 
 #test_code
 # ma = re.match(r'/proc/[1-9]+/stat', '/proc/212575/stat')
@@ -80,7 +120,7 @@ for pid in psutil.pids():
 # print(z[1])
 
 ssh_state = 2
-
+rules_flag = 0
 
 while 1:
     str =  input()
@@ -107,6 +147,35 @@ while 1:
             ssh_state=2
             print("+++ ssh be Scanned  : 先读取key 再扫描敏感文件 +++  PID:",str[0],"  COMM:",str[1])
     
+    # memory模块open文件序列检测 
+    # 敏感rules 
+    # for rule in rules:
+    #     if re.search(rule["process"], str[-1]):
+    #         rules_flag = 1
+    #         print("+++ rules get +++  PID:",str[0],"  COMM:",str[1])
+    
+    # memorpy库检测序列
+    # if str[-1] == "/proc/sys/kernel/yama/ptrace_scope" and memory_cnt==3:
+    if str[-1] == "/proc/sys/kernel/yama/ptrace_scope" and memory_cnt==3 :
+        memory_cnt -= 1
+    
+    # if str[-1] == "/proc/[1-9]+/mem" and memory_cnt==2:
+    if re.match(r"/proc/[1-9]+/mem",str[-1]) and memory_cnt==2 :
+        memory_cnt -= 1
+     
+    # if str[-1] == "/proc/[1-9]+/maps" and memory_cnt==1:
+    if re.match(r"/proc/[1-9]+/maps",str[-1]) and memory_cnt==1 :
+        memory_cnt -= 1   
+    
+    if memory_cnt == 0:
+        # if rules_flag ==1:
+        #     print("+++ proc/pid/mem be Scanned +++  PID:",str[0],"  COMM:",str[1]) 
+        print("+++ proc/pid/mem be Scanned +++  PID:",str[0],"  COMM:",str[1]) 
+        memory_cnt = 3
+        # rules_flag = 0
+    
+    
+    
     # 分pid统计/proc/*/stat
     ma = re.match(r'/proc/[1-9]+/stat', str[-1])
     # print(str[-1])
@@ -131,5 +200,11 @@ while 1:
         if piddict_stat[str[0]] == pidsum_stat and str[1]!='ps':
             print("+++ *** be Scanned +++  PID:",str[0],"  COMM:",str[1]," /proc/*/stat   ")   
     # else:
-    #     print("no match") 
+    #     print("no match")
+    
+    # for procdic in Process.list():
+    #     name = procdic["name"]
+    #     pid = int(procdic["pid"])
+
+
         
